@@ -5,7 +5,7 @@ import (
 	"html/template"
 )
 
-//go:embed templates/*
+//go:embed templates/template.html
 var TemplateFS embed.FS
 
 func LoadTemplates() (*template.Template, error) {
