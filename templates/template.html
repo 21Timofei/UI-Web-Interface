@@ -73,17 +73,16 @@
 
     ul li {
       margin: 0.5rem 0;
+      padding: 8px;
       cursor: grab;
+      background-color: #e9f5ff;
+      border-radius: 5px;
+      border: 1px solid #ccc;
     }
 
-    ul li a {
-      text-decoration: none;
-      color: #0056b3;
-      font-weight: 500;
-    }
-
-    ul li a:hover {
-      text-decoration: underline;
+    ul li:active {
+      cursor: grabbing;
+      opacity: 0.6;
     }
 
     .dropzone {
@@ -93,6 +92,10 @@
       background-color: #f0f8ff;
       border-radius: 10px;
       margin-bottom: 1rem;
+    }
+
+    .dropzone.dragover {
+      background-color: #d0eaff;
     }
 
     form {
@@ -115,7 +118,7 @@
       cursor: pointer;
       margin-top: auto;
       display: block;
-      width: 100%; /* Кнопка на всю ширину */
+      width: 100%;
       text-align: center;
     }
 
@@ -141,66 +144,83 @@
     }
   </style>
   <script>
-    function toggleSubmitButton() {
-      const fileInput = document.getElementById('fileInput');
-      const submitButton = document.getElementById('submitButton');
-      submitButton.style.display = fileInput.files.length > 0 ? 'block' : 'none';
-    }
+    document.addEventListener('DOMContentLoaded', () => {
+      const fileList = document.getElementById('fileList');
+      const deleteZone = document.getElementById('deleteZone');
+      const deleteButton = document.getElementById('deleteButton');
+      const filesToDelete = new Set();
 
-    const fileList = document.getElementById('fileList');
-    const deleteZone = document.getElementById('deleteZone');
-    const deleteButton = document.getElementById('deleteButton');
-    const filesToDelete = new Set();
+      // Добавляем обработчики событий drag & drop к каждому файлу
+      fileList.querySelectorAll('li').forEach(item => {
+        item.setAttribute("draggable", "true");
 
-    // Drag-and-drop events
-    fileList?.addEventListener('dragstart', (event) => {
-      event.dataTransfer.setData('text/plain', event.target.dataset.file);
-    });
+        // Начало перетаскивания
+        item.addEventListener('dragstart', (event) => {
+          event.dataTransfer.setData('text/plain', event.target.dataset.file);
+          event.target.classList.add('dragging');
+        });
 
-    deleteZone?.addEventListener('dragover', (event) => {
-      event.preventDefault();
-      deleteZone.classList.add('dragover');
-    });
+        // Убираем стиль при завершении перетаскивания
+        item.addEventListener('dragend', (event) => {
+          event.target.classList.remove('dragging');
+        });
+      });
 
-    deleteZone?.addEventListener('dragleave', () => {
-      deleteZone.classList.remove('dragover');
-    });
+      // Разрешаем перетаскивание в зону удаления
+      deleteZone.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        deleteZone.classList.add('dragover');
+      });
 
-    deleteZone?.addEventListener('drop', (event) => {
-      event.preventDefault();
-      deleteZone.classList.remove('dragover');
-      const fileName = event.dataTransfer.getData('text/plain');
-      if (!filesToDelete.has(fileName)) {
-        filesToDelete.add(fileName);
-        const fileElement = document.createElement('p');
-        fileElement.textContent = fileName;
-        deleteZone.appendChild(fileElement);
-      }
-      deleteButton.disabled = filesToDelete.size === 0;
-    });
+      deleteZone.addEventListener('dragleave', () => {
+        deleteZone.classList.remove('dragover');
+      });
 
-    // Удаление файлов
-    deleteButton?.addEventListener('click', () => {
-      const filesArray = Array.from(filesToDelete);
-      fetch('/delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ files: filesArray }),
-      })
-              .then((response) => {
-                if (response.ok) {
-                  alert('Файлы успешно удалены');
-                  filesToDelete.clear();
-                  deleteZone.innerHTML = 'Перетащите файлы сюда для удаления';
-                  deleteButton.disabled = true;
-                  location.reload();
-                } else {
-                  alert('Ошибка при удалении файлов');
-                }
-              })
-              .catch((error) => console.error('Ошибка:', error));
+      // Обработка удаления файлов
+      deleteZone.addEventListener('drop', (event) => {
+        event.preventDefault();
+        deleteZone.classList.remove('dragover');
+
+        const fileName = event.dataTransfer.getData('text/plain');
+        if (!filesToDelete.has(fileName)) {
+          filesToDelete.add(fileName);
+
+          // Добавляем файл в область удаления
+          const fileElement = document.createElement('p');
+          fileElement.textContent = fileName;
+          deleteZone.appendChild(fileElement);
+
+          // Удаляем файл из списка
+          const fileItem = document.querySelector(`[data-file="${fileName}"]`);
+          if (fileItem) fileItem.remove();
+        }
+
+        deleteButton.disabled = filesToDelete.size === 0;
+      });
+
+      // Удаление файлов на сервере
+      deleteButton.addEventListener('click', () => {
+        const filesArray = Array.from(filesToDelete);
+        fetch('/delete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ files: filesArray }),
+        })
+                .then((response) => {
+                  if (response.ok) {
+                    alert('Файлы успешно удалены');
+                    filesToDelete.clear();
+                    deleteZone.innerHTML = 'Перетащите файлы сюда для удаления';
+                    deleteButton.disabled = true;
+                    location.reload();
+                  } else {
+                    alert('Ошибка при удалении файлов');
+                  }
+                })
+                .catch((error) => console.error('Ошибка:', error));
+      });
     });
   </script>
 </head>
@@ -210,7 +230,6 @@
   <h1>S3 File Object Storage</h1>
 </header>
 <div class="container">
-  <!-- Левая колонка: Список файлов -->
   <div class="column">
     <div class="block">
       <h2>Список файлов</h2>
@@ -224,15 +243,7 @@
     </div>
   </div>
 
-  <!-- Правая колонка: Загрузка файла + Удаление -->
   <div class="column">
-    <div class="block">
-      <h2>Загрузить файл</h2>
-      <form enctype="multipart/form-data" action="/upload" method="post">
-        <input type="file" id="fileInput" name="file" onchange="toggleSubmitButton()">
-        <input type="submit" id="submitButton" value="Загрузить" style="display: none;">
-      </form>
-    </div>
     <div class="block">
       <h2>Удалить файлы</h2>
       <div id="deleteZone" class="dropzone">
