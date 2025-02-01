@@ -15,7 +15,7 @@
     body {
       font-family: 'Inter', sans-serif;
       background-color: #f5f5f5;
-      color: #333;
+      color: #333333;
       display: flex;
       flex-direction: column;
       min-height: 100vh;
@@ -30,9 +30,14 @@
       justify-content: space-between;
     }
 
+    header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
     .container {
       width: 100%;
-      margin: 2rem auto;
+      margin: 2rem 0;
       display: flex;
       flex-direction: row;
       gap: 1rem;
@@ -50,7 +55,7 @@
       width: 100%;
       background-color: #ffffff;
       border-radius: 10px;
-      padding: 1.5rem;
+      padding: 1rem 2rem;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     }
 
@@ -74,9 +79,12 @@
       border: 1px solid #ccc;
     }
 
+    ul li:hover {
+      background-color: #d7ebff;
+    }
+
     ul li:active {
       cursor: grabbing;
-      opacity: 0.6;
     }
 
     .dropzone {
@@ -86,24 +94,22 @@
       background-color: #f0f8ff;
       border-radius: 10px;
       margin-bottom: 1rem;
-      min-height: 50px;
     }
 
     .dropzone.dragover {
       background-color: #d0eaff;
     }
 
-    .upload-container {
+    .dropzone p {
+      margin: 0.5rem 0;
+      color: #333333;
+      font-weight: 500;
+    }
+
+    form {
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      align-items: center;
-    }
-
-    input[type="file"] {
-      display: block;
-      width: 100%;
-      padding: 0.5rem;
     }
 
     input[type="submit"] {
@@ -114,47 +120,121 @@
       border-radius: 5px;
       font-size: 1rem;
       cursor: pointer;
+      margin-top: auto;
+      display: block;
       width: 100%;
-      display: none; /* Скрыта изначально */
       text-align: center;
     }
 
     input[type="submit"]:hover {
       background-color: #003d80;
     }
+
+    footer {
+      text-align: center;
+      padding: 1rem 0;
+      background-color: #002033;
+      color: white;
+      margin-top: auto;
+    }
+
+    footer a {
+      color: #00d8ff;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
   </style>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const fileList = document.getElementById('fileList');
+      const deleteZone = document.getElementById('deleteZone');
+      const deleteButton = document.getElementById('deleteButton');
+      const filesToDelete = new Set();
+
+      // Drag and drop functionality
+      fileList.addEventListener('dragstart', (event) => {
+        const fileName = event.target.getAttribute('data-file');
+        event.dataTransfer.setData('text/plain', fileName);
+      });
+
+      deleteZone.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        deleteZone.classList.add('dragover');
+      });
+
+      deleteZone.addEventListener('dragleave', () => {
+        deleteZone.classList.remove('dragover');
+      });
+
+      deleteZone.addEventListener('drop', (event) => {
+        event.preventDefault();
+        deleteZone.classList.remove('dragover');
+
+        const fileName = event.dataTransfer.getData('text/plain');
+        if (!filesToDelete.has(fileName)) {
+          filesToDelete.add(fileName);
+
+          // Add file name to the delete zone
+          const fileElement = document.createElement('p');
+          fileElement.textContent = fileName;
+          deleteZone.appendChild(fileElement);
+
+          // Remove file from the original list
+          const fileItem = document.querySelector(`[data-file="${fileName}"]`);
+          if (fileItem) fileItem.remove();
+        }
+
+        deleteButton.disabled = filesToDelete.size === 0;
+      });
+
+      // Delete button functionality
+      deleteButton.addEventListener('click', () => {
+        const filesArray = Array.from(filesToDelete);
+        fetch('/delete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ files: filesArray }),
+        })
+                .then((response) => {
+                  if (response.ok) {
+                    alert('Файлы успешно удалены');
+                    filesToDelete.clear();
+                    deleteZone.innerHTML = 'Перетащите файлы сюда для удаления';
+                    deleteButton.disabled = true;
+                  } else {
+                    alert('Ошибка при удалении файлов');
+                  }
+                })
+                .catch((error) => console.error('Ошибка:', error));
+      });
+    });
+  </script>
 </head>
 
 <body>
 <header>
   <h1>S3 File Object Storage</h1>
 </header>
-
-<div class="block">
-  <h2>Список файлов</h2>
-  <ul id="fileList">
-    {{range .Files }}
-      <li>
-        <a href="/download?name={{.}}" download>{{.}}</a>
-      </li>
-    {{else}}
-      <li>Файлы отсутствуют.</li>
-    {{end}}
-  </ul>
-</div>
-
 <div class="container">
   <div class="column">
-    <!-- Блок загрузки файла -->
     <div class="block">
-      <h2>Загрузить файл</h2>
-      <form enctype="multipart/form-data" action="/upload" method="post" class="upload-container">
-        <input type="file" id="fileInput" name="file" onchange="toggleSubmitButton()">
-        <input type="submit" id="submitButton" value="Загрузить">
-      </form>
+      <h2>Список файлов</h2>
+      <ul id="fileList">
+        {{range .Files }}
+          <li draggable="true" data-file="{{.}}">{{.}}</li>
+        {{else}}
+          <li>Файлы отсутствуют.</li>
+        {{end}}
+      </ul>
     </div>
+  </div>
 
-    <!-- Блок удаления файлов -->
+  <div class="column">
     <div class="block">
       <h2>Удалить файлы</h2>
       <div id="deleteZone" class="dropzone">
@@ -164,72 +244,9 @@
     </div>
   </div>
 </div>
-
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const fileInput = document.getElementById('fileInput');
-    const submitButton = document.getElementById('submitButton');
-    const deleteZone = document.getElementById('deleteZone');
-    const deleteButton = document.getElementById('deleteButton');
-    const filesToDelete = new Set();
-
-    // Функция скрывает/показывает кнопку "Загрузить" при выборе файла
-    function toggleSubmitButton() {
-      submitButton.style.display = fileInput.files.length > 0 ? 'block' : 'none';
-    }
-
-    // Разрешаем перетаскивание в зону удаления
-    deleteZone.addEventListener('dragover', (event) => {
-      event.preventDefault();
-      deleteZone.classList.add('dragover');
-    });
-
-    deleteZone.addEventListener('dragleave', () => {
-      deleteZone.classList.remove('dragover');
-    });
-
-    // Обработка перетаскивания файлов в зону удаления
-    deleteZone.addEventListener('drop', (event) => {
-      event.preventDefault();
-      deleteZone.classList.remove('dragover');
-
-      const fileName = event.dataTransfer.getData('text/plain');
-      if (!filesToDelete.has(fileName) && fileName) {
-        filesToDelete.add(fileName);
-
-        // Добавляем файл в зону удаления
-        const fileElement = document.createElement('p');
-        fileElement.textContent = fileName;
-        deleteZone.appendChild(fileElement);
-      }
-
-      deleteButton.disabled = filesToDelete.size === 0;
-    });
-
-    // Удаление файлов на сервере
-    deleteButton.addEventListener('click', () => {
-      const filesArray = Array.from(filesToDelete);
-      fetch('/delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ files: filesArray }),
-      })
-              .then((response) => {
-                if (response.ok) {
-                  alert('Файлы успешно удалены');
-                  filesToDelete.clear();
-                  deleteZone.innerHTML = 'Перетащите файлы сюда для удаления';
-                  deleteButton.disabled = true;
-                } else {
-                  alert('Ошибка при удалении файлов');
-                }
-              })
-              .catch((error) => console.error('Ошибка:', error));
-    });
-  });
-</script>
-
+<footer>
+  &copy; 2025 S3 Object Storage | <a href="https://cloud.yandex.ru">Powered by Yandex Cloud</a>
+</footer>
 </body>
+
 </html>
