@@ -32,11 +32,11 @@
 
     .container {
       width: 100%;
-      margin: 2rem auto;
+      margin: 2rem 0;
       display: flex;
       flex-direction: row;
       gap: 1rem;
-      padding: 0;
+      padding: 0 2rem; /* Немного отступа слева и справа */
     }
 
     .column {
@@ -50,7 +50,7 @@
       width: 100%;
       background-color: #ffffff;
       border-radius: 10px;
-      padding: 1.5rem;
+      padding: 1rem 2rem;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     }
 
@@ -74,6 +74,11 @@
       border: 1px solid #ccc;
     }
 
+    ul li a {
+      text-decoration: none;
+      color: #0056b3;
+    }
+
     ul li:active {
       cursor: grabbing;
       opacity: 0.6;
@@ -93,19 +98,6 @@
       background-color: #d0eaff;
     }
 
-    .upload-container {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      align-items: center;
-    }
-
-    input[type="file"] {
-      display: block;
-      width: 100%;
-      padding: 0.5rem;
-    }
-
     input[type="submit"] {
       background-color: #0056b3;
       color: white;
@@ -114,13 +106,23 @@
       border-radius: 5px;
       font-size: 1rem;
       cursor: pointer;
-      width: 100%;
-      display: none; /* Скрыта изначально */
-      text-align: center;
+      margin-top: 1rem;
+      display: inline-block;
     }
 
     input[type="submit"]:hover {
       background-color: #003d80;
+    }
+
+    /* Стили для формы загрузки */
+    #uploadForm {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    #uploadInput {
+      max-width: 300px; /* пример ограниченной ширины */
     }
   </style>
 </head>
@@ -129,32 +131,35 @@
 <header>
   <h1>S3 File Object Storage</h1>
 </header>
-
-<div class="block">
-  <h2>Список файлов</h2>
-  <ul id="fileList">
-    {{range .Files }}
-      <li>
-        <a href="/download?name={{.}}" download>{{.}}</a>
-      </li>
-    {{else}}
-      <li>Файлы отсутствуют.</li>
-    {{end}}
-  </ul>
-</div>
-
 <div class="container">
   <div class="column">
-    <!-- Блок загрузки файла -->
+    <!-- Список файлов с возможностью скачивания -->
     <div class="block">
-      <h2>Загрузить файл</h2>
-      <form enctype="multipart/form-data" action="/upload" method="post" class="upload-container">
-        <input type="file" id="fileInput" name="file" onchange="toggleSubmitButton()">
-        <input type="submit" id="submitButton" value="Загрузить">
+      <h2>Список файлов</h2>
+      <ul id="fileList">
+        {{range .Files }}
+          <!-- Пример ссылки для скачивания: /download?file=имя_файла -->
+          <li draggable="true" data-file="{{.}}">
+            <a href="/download?file={{.}}" download>{{.}}</a>
+          </li>
+        {{else}}
+          <li>Файлы отсутствуют.</li>
+        {{end}}
+      </ul>
+    </div>
+  </div>
+
+  <div class="column">
+    <!-- Блок ЗАГРУЗКИ ФАЙЛОВ -->
+    <div class="block">
+      <h2>Загрузить файлы</h2>
+      <form id="uploadForm" method="POST" enctype="multipart/form-data">
+        <input type="file" id="uploadInput" name="files" multiple>
+        <input type="submit" value="Загрузить файлы">
       </form>
     </div>
 
-    <!-- Блок удаления файлов -->
+    <!-- Блок УДАЛЕНИЯ ФАЙЛОВ -->
     <div class="block">
       <h2>Удалить файлы</h2>
       <div id="deleteZone" class="dropzone">
@@ -167,18 +172,25 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    const fileInput = document.getElementById('fileInput');
-    const submitButton = document.getElementById('submitButton');
+    const fileList = document.getElementById('fileList');
     const deleteZone = document.getElementById('deleteZone');
     const deleteButton = document.getElementById('deleteButton');
     const filesToDelete = new Set();
 
-    // Функция скрывает/показывает кнопку "Загрузить" при выборе файла
-    function toggleSubmitButton() {
-      submitButton.style.display = fileInput.files.length > 0 ? 'block' : 'none';
-    }
+    // --- ЛОГИКА ПЕРЕТАСКИВАНИЯ (Drag & Drop) ДЛЯ УДАЛЕНИЯ ---
+    fileList.querySelectorAll('li').forEach(item => {
+      item.setAttribute("draggable", "true");
 
-    // Разрешаем перетаскивание в зону удаления
+      item.addEventListener('dragstart', (event) => {
+        event.dataTransfer.setData('text/plain', event.target.dataset.file);
+        event.target.classList.add('dragging');
+      });
+
+      item.addEventListener('dragend', (event) => {
+        event.target.classList.remove('dragging');
+      });
+    });
+
     deleteZone.addEventListener('dragover', (event) => {
       event.preventDefault();
       deleteZone.classList.add('dragover');
@@ -188,7 +200,6 @@
       deleteZone.classList.remove('dragover');
     });
 
-    // Обработка перетаскивания файлов в зону удаления
     deleteZone.addEventListener('drop', (event) => {
       event.preventDefault();
       deleteZone.classList.remove('dragover');
@@ -197,16 +208,20 @@
       if (!filesToDelete.has(fileName) && fileName) {
         filesToDelete.add(fileName);
 
-        // Добавляем файл в зону удаления
+        // Добавляем название файла в зону удаления
         const fileElement = document.createElement('p');
         fileElement.textContent = fileName;
         deleteZone.appendChild(fileElement);
+
+        // Удаляем файл из списка
+        const fileItem = document.querySelector(`[data-file="${fileName}"]`);
+        if (fileItem) fileItem.remove();
       }
 
       deleteButton.disabled = filesToDelete.size === 0;
     });
 
-    // Удаление файлов на сервере
+    // --- ОТПРАВКА ЗАПРОСА НА УДАЛЕНИЕ ---
     deleteButton.addEventListener('click', () => {
       const filesArray = Array.from(filesToDelete);
       fetch('/delete', {
@@ -222,14 +237,45 @@
                   filesToDelete.clear();
                   deleteZone.innerHTML = 'Перетащите файлы сюда для удаления';
                   deleteButton.disabled = true;
+                  location.reload();
                 } else {
                   alert('Ошибка при удалении файлов');
                 }
               })
               .catch((error) => console.error('Ошибка:', error));
     });
+
+    // --- ОТПРАВКА ФАЙЛОВ НА СЕРВЕР (ЗАГРУЗКА) ---
+    const uploadForm = document.getElementById('uploadForm');
+    uploadForm.addEventListener('submit', (event) => {
+      event.preventDefault(); // отменяем обычную отправку формы
+
+      const uploadInput = document.getElementById('uploadInput');
+      const formData = new FormData();
+
+      // Добавляем все выбранные файлы в FormData
+      for (let i = 0; i < uploadInput.files.length; i++) {
+        formData.append('files', uploadInput.files[i]);
+      }
+
+      // Отправляем запрос на /upload
+      fetch('/upload', {
+        method: 'POST',
+        body: formData
+      })
+              .then(response => {
+                if (response.ok) {
+                  alert('Файлы успешно загружены');
+                  location.reload();
+                } else {
+                  alert('Ошибка при загрузке файлов');
+                }
+              })
+              .catch((error) => {
+                console.error('Ошибка загрузки:', error);
+              });
+    });
   });
 </script>
-
 </body>
 </html>
