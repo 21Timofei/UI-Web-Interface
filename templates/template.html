@@ -32,7 +32,7 @@
 
     .container {
       width: 100%;
-      margin: 2rem 0;
+      margin: 2rem auto;
       display: flex;
       flex-direction: row;
       gap: 1rem;
@@ -50,7 +50,7 @@
       width: 100%;
       background-color: #ffffff;
       border-radius: 10px;
-      padding: 1rem 2rem;
+      padding: 1.5rem;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     }
 
@@ -93,6 +93,19 @@
       background-color: #d0eaff;
     }
 
+    .upload-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    input[type="file"] {
+      display: block;
+      width: 100%;
+      padding: 0.5rem;
+    }
+
     input[type="submit"] {
       background-color: #0056b3;
       color: white;
@@ -101,9 +114,9 @@
       border-radius: 5px;
       font-size: 1rem;
       cursor: pointer;
-      margin-top: auto;
-      display: block;
       width: 100%;
+      display: none; /* Скрыта изначально */
+      text-align: center;
     }
 
     input[type="submit"]:hover {
@@ -116,21 +129,19 @@
 <header>
   <h1>S3 File Object Storage</h1>
 </header>
+
 <div class="container">
   <div class="column">
+    <!-- Блок загрузки файла -->
     <div class="block">
-      <h2>Список файлов</h2>
-      <ul id="fileList">
-        {{range .Files }}
-          <li draggable="true" data-file="{{.}}">{{.}}</li>
-        {{else}}
-          <li>Файлы отсутствуют.</li>
-        {{end}}
-      </ul>
+      <h2>Загрузить файл</h2>
+      <form enctype="multipart/form-data" action="/upload" method="post" class="upload-container">
+        <input type="file" id="fileInput" name="file" onchange="toggleSubmitButton()">
+        <input type="submit" id="submitButton" value="Загрузить">
+      </form>
     </div>
-  </div>
 
-  <div class="column">
+    <!-- Блок удаления файлов -->
     <div class="block">
       <h2>Удалить файлы</h2>
       <div id="deleteZone" class="dropzone">
@@ -143,24 +154,16 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    const fileList = document.getElementById('fileList');
+    const fileInput = document.getElementById('fileInput');
+    const submitButton = document.getElementById('submitButton');
     const deleteZone = document.getElementById('deleteZone');
     const deleteButton = document.getElementById('deleteButton');
     const filesToDelete = new Set();
 
-    // Добавляем обработчики к каждому файлу
-    fileList.querySelectorAll('li').forEach(item => {
-      item.setAttribute("draggable", "true");
-
-      item.addEventListener('dragstart', (event) => {
-        event.dataTransfer.setData('text/plain', event.target.dataset.file);
-        event.target.classList.add('dragging');
-      });
-
-      item.addEventListener('dragend', (event) => {
-        event.target.classList.remove('dragging');
-      });
-    });
+    // Функция скрывает/показывает кнопку "Загрузить" при выборе файла
+    function toggleSubmitButton() {
+      submitButton.style.display = fileInput.files.length > 0 ? 'block' : 'none';
+    }
 
     // Разрешаем перетаскивание в зону удаления
     deleteZone.addEventListener('dragover', (event) => {
@@ -172,7 +175,7 @@
       deleteZone.classList.remove('dragover');
     });
 
-    // Обработка перетаскивания в зону удаления
+    // Обработка перетаскивания файлов в зону удаления
     deleteZone.addEventListener('drop', (event) => {
       event.preventDefault();
       deleteZone.classList.remove('dragover');
@@ -185,10 +188,6 @@
         const fileElement = document.createElement('p');
         fileElement.textContent = fileName;
         deleteZone.appendChild(fileElement);
-
-        // Удаляем файл из списка
-        const fileItem = document.querySelector(`[data-file="${fileName}"]`);
-        if (fileItem) fileItem.remove();
       }
 
       deleteButton.disabled = filesToDelete.size === 0;
@@ -210,7 +209,6 @@
                   filesToDelete.clear();
                   deleteZone.innerHTML = 'Перетащите файлы сюда для удаления';
                   deleteButton.disabled = true;
-                  location.reload();
                 } else {
                   alert('Ошибка при удалении файлов');
                 }
