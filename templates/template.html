@@ -130,6 +130,19 @@
   <h1>S3 File Object Storage</h1>
 </header>
 
+<div class="block">
+  <h2>Список файлов</h2>
+  <ul id="fileList">
+    {{range .Files }}
+      <li>
+        <a href="/download?name={{.}}" download>{{.}}</a>
+      </li>
+    {{else}}
+      <li>Файлы отсутствуют.</li>
+    {{end}}
+  </ul>
+</div>
+
 <div class="container">
   <div class="column">
     <!-- Блок загрузки файла -->
